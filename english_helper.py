@@ -10,18 +10,34 @@ st.title("📚 批量英语单词释义工具")
 
 # 定义获取释义的函数 (使用免费 API)
 def get_definition(word):
-    url = f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}"
+    # 1. 预处理：变小写并去除空格
+    word = word.lower().strip()
+    
+    # 2. 备用方案：尝试多个免费 API 来源
+    urls = [
+        f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}",
+        f"https://api.datamuse.com/words?sp={word}&d=definitions&max=1"
+    ]
+    
     try:
-        response = requests.get(url)
+        # 先试第一个主流 API
+        response = requests.get(urls[0], timeout=5)
         if response.status_code == 200:
             data = response.json()
-            # 提取第一个义项
-            definition = data[0]['meanings'][0]['definitions'][0]['definition']
-            return definition
-        else:
-            return "Definition not found."
+            return data[0]['meanings'][0]['definitions'][0]['definition']
+        
+        # 如果第一个失败了，自动尝试第二个备份 API (Datamuse)
+        response_backup = requests.get(urls[1], timeout=5)
+        if response_backup.status_code == 200:
+            data_backup = response_backup.json()
+            if data_backup and 'defs' in data_backup[0]:
+                # 提取备份 API 的释义并去掉前缀
+                raw_def = data_backup[0]['defs'][0]
+                return raw_def.split('\t')[-1] 
+                
+        return "Definition not found (Tried backup)."
     except:
-        return "Error connecting to dictionary."
+        return "Connection Error."
 
 # 侧边栏：导入选项
 st.sidebar.header("导入方式")
